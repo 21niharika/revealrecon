@@ -35,20 +35,11 @@ pip install -r requirements.txt
 ##  Example Commands
 
 ```bash
-# Basic domain recon
-python revealrecon.py -d target.com
-
-# Include and exclude subdomains
-python revealrecon.py -d target.com --include blog --exclude admin
-
-# Save categorized output
-python revealrecon.py -d target.com --save
-
-# Extract live parameterized URLs
-python revealrecon.py -d target.com --params --live
-
-# Detect leaked data (emails, tech, IPs)
-python revealrecon.py -d target.com --leaks --save
+python3 reconx.py -d example.com
+python3 reconx.py -d example.com --params
+python3 reconx.py -d example.com --ext js,pdf
+python3 reconx.py -d example.com --include api.example.com
+python3 reconx.py -d example.com --exclude old.example.com
 
 ```
 
@@ -66,11 +57,15 @@ python revealrecon.py -d example.com
 🛠️ Available Command-Line Flags
 ```bash
 options:
-  -h, --help  show this help message and exit
-  --params    Show URLs with parameters
-  --ext       Show URLs with file extensions
-  --live      Show only live URLs/subdomains
-  --leaks     Display sensitive info leaks
+| Flag                                       | Description                                      |
+| ------------------------------------------ | ------------------------------------------------ |
+| `-d`, `--domain`                           | **(Required)** Target domain for enumeration     |
+| `--params`                                 | Extract only parameterized URLs                  |
+| `--ext pdf,js,...`                         | Filter URLs by file extensions (comma-separated) |
+| `--include sub1.domain.com,api.domain.com` | Include only specific subdomains                 |
+| `--exclude dev.domain.com,old.domain.com`  | Exclude specific subdomains from results         |
+| `-h`, `--help`                             | Show help message                                |
+
 ```
 
 📂 Output Structure
