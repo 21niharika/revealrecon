@@ -1,155 +1,193 @@
+#!/usr/bin/env python3
 
-import argparse
 import requests
+import tldextract
+import dns.resolver
+import argparse
 import re
-import os
-from urllib.parse import urlparse, parse_qs
-from bs4 import BeautifulSoup
-
+from pyfiglet import figlet_format
+from termcolor import colored
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 # Stylish banner
 def banner():
     print("""
 \033[1;36m
-██████╗ ███████╗██║       ██║ ███████╗ █████╗ ██╗     ██████╗ ███████╗ ██████╗ ██████╗ ███╗    ██╗ 
-██╔══██╗██╔════╝║██║     ██║  ██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝██╔════╝██╔═══██╗████╗  ██║
+██████╗ ███████╗██║       ██║ ███████╗ █████╗ ██╗     ██████╗ ███████╗ ██████╗  ██████╗ ███╗   ██╗ 
+██╔══██╗██╔════╝║██║     ██║  ██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝██╔════╝ ██╔═══██╗████╗  ██║
 ██████╔╝█████╗   ║██║   ██║   █████╗  ███████║██║     ██████╔╝█████╗  ██║      ██║   ██║██╔██╗ ██║
 ██╔══██╗██╔══╝    ║██  ██║    ██╔══╝  ██╔══██║██║     ██╔══██╗██╔══╝  ██║      ██║   ██║██║╚██╗██║
-██║  ██║███████╗    ║██║      ███████╗██║  ██║███████╗██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║
-╚═╝  ╚═╝╚══════╝    ╚══╝      ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝
+██║  ██║███████╗    ║██║      ███████╗██║  ██║███████╗██║  ██║███████╗╚██████╗ ╚██████╔╝██║ ╚████║
+╚═╝  ╚═╝╚══════╝    ╚══╝      ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝
                                                                                         -by NIH@RIK@
 \033[0m
     """)
 
-# Output saving
-def save_output(data, filename):
-    os.makedirs("output", exist_ok=True)
-    with open(os.path.join("output", filename), "w") as f:
-        f.write("\n".join(sorted(set(data))))
 
-# Check if URL is alive
-def is_alive(url):
+def extract_root(domain):
+    tld = tldextract.extract(domain)
+    return f"{tld.domain}.{tld.suffix}"
+
+def make_output_dir():
+    Path("output").mkdir(exist_ok=True)
+
+def save_file(name, content):
+    make_output_dir()
+    with open(f"output/{name}", "w") as f:
+        for line in sorted(set(content)):
+            f.write(line + "\n")
+
+def print_section(title, data):
+    print(colored(f"\n==[ {title} ]==", "cyan"))
+    if data:
+        for item in sorted(set(data)):
+            print(item)
+    else:
+        print("No data found.")
+
+def get_crtsh(domain):
     try:
-        res = requests.head(url, timeout=3, allow_redirects=True)
-        return res.status_code < 400
+        r = requests.get(f"https://crt.sh/?q=%25.{domain}&output=json", timeout=10)
+        subdomains = set()
+        if r.ok:
+            for cert in r.json():
+                for name in cert['name_value'].split('\n'):
+                    if domain in name:
+                        subdomains.add(name.strip())
+        return sorted(subdomains)
     except:
-        return False
+        return []
 
-# Discover basic subdomains
-def discover_subdomains(domain):
-    subdomains = set()
-    wordlist = ['www', 'mail', 'test', 'dev', 'api', 'beta']
-    for word in wordlist:
-        sub = f"http://{word}.{domain}"
-        if is_alive(sub):
-            subdomains.add(sub)
-    return subdomains
-
-# Crawl basic URLs
-def discover_urls(domain):
-    urls = set()
-    base_url = f"http://{domain}"
+def get_certspotter(domain):
     try:
-        res = requests.get(base_url, timeout=5)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            if href.startswith("/"):
-                href = f"{base_url}{href}"
-            if domain in href:
-                urls.add(href)
+        r = requests.get(f"https://api.certspotter.com/v1/issuances?domain={domain}&include_subdomains=true&expand=dns_names", timeout=10)
+        subs = set()
+        if r.ok:
+            for cert in r.json():
+                for name in cert.get('dns_names', []):
+                    if domain in name:
+                        subs.add(name.strip())
+        return sorted(subs)
+    except:
+        return []
+
+def dns_bruteforce(domain):
+    wordlist = ["www", "mail", "dev", "api", "admin", "ftp", "blog", "cdn", "m"]
+    found = []
+    resolver = dns.resolver.Resolver()
+    for sub in wordlist:
+        fqdn = f"{sub}.{domain}"
+        try:
+            resolver.resolve(fqdn, 'A')
+            found.append(fqdn)
+        except:
+            continue
+    return found
+
+def check_alive(url):
+    try:
+        res = requests.head(url, timeout=5, allow_redirects=True)
+        if res.status_code < 400:
+            return url
     except:
         pass
-    return urls
+    return None
 
-# Extract parameterized URLs
-def extract_params(urls):
-    return [u for u in urls if "?" in u]
+def get_wayback_urls(domain):
+    try:
+        r = requests.get(f"http://web.archive.org/cdx/search/cdx?url=*.{domain}/*&output=text&fl=original&collapse=urlkey", timeout=10)
+        return list(set(r.text.strip().split('\n'))) if r.ok else []
+    except:
+        return []
 
-# Extract extension-based URLs
-def extract_extensions(urls, extensions=[".js", ".json", ".php", ".aspx", ".zip"]):
-    return [u for u in urls if any(u.lower().endswith(ext) for ext in extensions)]
-
-# Leak detection
-def detect_leaks(urls):
-    leaks = []
-    email_regex = r"[\w.-]+@[\w.-]+\.\w+"
-    ip_regex = r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)"
-    tech_regex = r"(apache|nginx|php|mysql|express|flask|django|node\.js|tomcat)"
+def extract_info_from_urls(urls):
+    emails, techs, ips, databases, leaks, ext_files = [], [], [], [], [], []
+    ip_pattern = r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)"
     for url in urls:
         try:
-            res = requests.get(url, timeout=3)
-            content = res.text
-            leaks += re.findall(email_regex, content)
-            leaks += re.findall(ip_regex, content)
-            leaks += re.findall(tech_regex, content, re.IGNORECASE)
+            r = requests.get(url, timeout=7)
+            content = r.text
+            if r.status_code < 400:
+                emails += re.findall(r"[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}", content)
+                techs += re.findall(r"(Apache|Nginx|PHP|Node\.js|Express|Tomcat|Jenkins|WordPress|Drupal|Laravel|Spring)", content, re.I)
+                ips += re.findall(ip_pattern, content)
+                databases += re.findall(r"(MySQL|PostgreSQL|MongoDB|Redis|MariaDB|Oracle)", content, re.I)
+                leaks += re.findall(r"(api_key|secret|token|password|admin)", content, re.I)
         except:
-            pass
-    return set(leaks)
+            continue
+        if any(url.lower().endswith(ext) for ext in [".js", ".json", ".xml", ".pdf", ".sql", ".zip", ".env", ".log"]):
+            ext_files.append(url)
+    return {
+        "emails": sorted(set(emails)),
+        "technologies": sorted(set(techs)),
+        "ips": sorted(set(ips)),
+        "databases": sorted(set(databases)),
+        "leaks": sorted(set(leaks)),
+        "ext_files": sorted(set(ext_files))
+    }
 
-# Main
 def main():
-    parser = argparse.ArgumentParser(description="RevealRecon - Subdomain & URL Discovery Tool")
-    parser.add_argument("domain", help="Target domain name (e.g., example.com)")
-    parser.add_argument("--params", action="store_true", help="Show URLs with parameters")
-    parser.add_argument("--ext", action="store_true", help="Show URLs with file extensions")
-    parser.add_argument("--live", action="store_true", help="Show only live URLs/subdomains")
-    parser.add_argument("--leaks", action="store_true", help="Display sensitive info leaks")
+    banner()
+    parser = argparse.ArgumentParser(description="ReconX by Niharika - Deep Recon Tool")
+    parser.add_argument("-d", "--domain", required=True, help="Target domain")
+    parser.add_argument("--params", action="store_true", help="Show only URLs with parameters")
+    parser.add_argument("--ext", help="Filter by extensions (e.g. js,pdf,zip)")
+    parser.add_argument("--include", help="Include subdomain keywords (comma-separated)")
+    parser.add_argument("--exclude", help="Exclude subdomain keywords (comma-separated)")
     args = parser.parse_args()
 
-    banner()
+    domain = extract_root(args.domain)
 
-    domain = args.domain
-    print(f"[+] Target: {domain}\n")
+    subdomains = set(get_crtsh(domain) + get_certspotter(domain) + dns_bruteforce(domain))
+    print_section("All Subdomains", subdomains)
+    save_file("subdomains.txt", subdomains)
 
-    # Subdomain Discovery
-    print("[*] Discovering subdomains...")
-    subdomains = discover_subdomains(domain)
-    if args.live:
-        subdomains = [s for s in subdomains if is_alive(s)]
-    print("\n[+] Subdomains Found:")
-    for s in subdomains:
-        print(f"  - {s}")
-    save_output(subdomains, "subdomains.txt")
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        live_subs = list(filter(None, executor.map(lambda s: check_alive(f"http://{s}"), subdomains)))
+    print_section("Live Subdomains", live_subs)
+    save_file("subdomains_live.txt", live_subs)
 
-    # URL Discovery
-    print("\n[*] Crawling URLs...")
-    urls = discover_urls(domain)
-    if args.live:
-        urls = [u for u in urls if is_alive(u)]
-    print("\n[+] URLs Found:")
-    for u in urls:
-        print(f"  - {u}")
-    save_output(urls, "urls.txt")
+    all_urls = []
+    for sub in subdomains:
+        all_urls += get_wayback_urls(sub)
+    all_urls = sorted(set([u for u in all_urls if u.startswith("http")]))
+    print_section("All URLs", all_urls)
+    save_file("urls.txt", all_urls)
 
-    # Parameterized URLs
+    with ThreadPoolExecutor(max_workers=30) as executor:
+        live_urls = list(filter(None, executor.map(check_alive, all_urls)))
+    print_section("Live URLs", live_urls)
+    save_file("urls_live.txt", live_urls)
+
     if args.params:
-        param_urls = extract_params(urls)
-        print("\n[+] Parameterized URLs:")
-        for pu in param_urls:
-            print(f"  - {pu}")
-        save_output(param_urls, "urls_with_params.txt")
+        param_urls = [u for u in live_urls if "?" in u]
+        print_section("URLs with Parameters", param_urls)
+        save_file("urls_with_params.txt", param_urls)
 
-    # Extension-based URLs
     if args.ext:
-        ext_urls = extract_extensions(urls)
-        print("\n[+] URLs with Extensions:")
-        for eu in ext_urls:
-            print(f"  - {eu}")
-        save_output(ext_urls, "urls_with_ext.txt")
+        ext_list = [e.strip() for e in args.ext.split(",")]
+        ext_urls = [u for u in live_urls if any(u.lower().endswith(f".{ext}") for ext in ext_list)]
+        print_section(f"URLs with Extensions: {args.ext}", ext_urls)
+        save_file("urls_with_ext.txt", ext_urls)
 
-    # Leak Detection
-    if args.leaks:
-        print("\n[*] Scanning for sensitive leaks...")
-        leaks = detect_leaks(urls)
-        if leaks:
-            print("\n[+] Leaks Found:")
-            for item in leaks:
-                print(f"  - {item}")
-            save_output(leaks, "leaks_found.txt")
-        else:
-            print("[-] No obvious leaks detected.")
+    if args.include:
+        keywords = args.include.split(",")
+        inc_urls = [u for u in live_urls if any(k in u for k in keywords)]
+        print_section("Included Subdomain URLs", inc_urls)
+        save_file("urls_included.txt", inc_urls)
 
-    print("\n[✓] All results saved in 'output/' directory.")
+    if args.exclude:
+        keywords = args.exclude.split(",")
+        exc_urls = [u for u in live_urls if all(k not in u for k in keywords)]
+        print_section("Excluded Subdomain URLs", exc_urls)
+        save_file("urls_excluded.txt", exc_urls)
+
+    print(colored("\n[+] Extracting sensitive information from live URLs...\n", "yellow"))
+    info = extract_info_from_urls(live_urls)
+
+    for key, value in info.items():
+        print_section(f"{key.title().replace('_',' ')}", value)
+        save_file(f"{key}.txt", value)
 
 if __name__ == "__main__":
     main()
