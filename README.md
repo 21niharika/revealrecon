@@ -17,7 +17,6 @@
   - File extensions (e.g., `.js`, `.php`, `.html`, `.csv`, etc.)
 - Organizes output into categorized sections
 - Saves results into neatly structured files
-- Optionally includes/excludes subdomains
 - Displays useful leaked info: emails, IPs, server tech, etc.
 
 ---
@@ -36,10 +35,6 @@ pip install -r requirements.txt
 
 ```bash
 python3 reconx.py -d example.com
-python3 reconx.py -d example.com --params
-python3 reconx.py -d example.com --ext js,pdf
-python3 reconx.py -d example.com --include api.example.com
-python3 reconx.py -d example.com --exclude old.example.com
 
 ```
 
@@ -59,12 +54,7 @@ python revealrecon.py -d example.com
 options:
 | Flag                                       | Description                                      |
 | ------------------------------------------ | ------------------------------------------------ |
-| `-d`, `--domain`                           | **(Required)** Target domain for enumeration     |
-| `--params`                                 | Extract only parameterized URLs                  |
-| `--ext pdf,js,...`                         | Filter URLs by file extensions (comma-separated) |
-| `--include sub1.domain.com,api.domain.com` | Include only specific subdomains                 |
-| `--exclude dev.domain.com,old.domain.com`  | Exclude specific subdomains from results         |
-| `-h`, `--help`                             | Show help message                                |
+| -d, --domain                               | **(Required)** Target domain for enumeration     |                               
 
 ```
 
@@ -128,6 +118,17 @@ You're participating in a bug bounty or internal VAPT assessment and need to qui
     Save everything in structured files for later testing
 
 RevealRecon does it all in one go.
+
+
+#Screenshots
+
+<img width="1920" height="1029" alt="Screenshot 2025-07-12 010206" src="https://github.com/user-attachments/assets/950865d7-48b3-4917-b6f5-2fbbab610984" />
+<img width="1920" height="1029" alt="Screenshot 2025-07-12 010137" src="https://github.com/user-attachments/assets/832598c8-3483-497a-b30d-d140296c9763" />
+<img width="1920" height="1029" alt="Screenshot 2025-07-12 010724" src="https://github.com/user-attachments/assets/b5f62f90-e33b-4cc3-88bf-f7e368b100f0" />
+<img width="1920" height="1029" alt="Screenshot 2025-07-12 010659" src="https://github.com/user-attachments/assets/a6b92d2b-69de-4e13-bbc0-b2d67bdcfd97" />
+<img width="1920" height="1029" alt="Screenshot 2025-07-12 010650" src="https://github.com/user-attachments/assets/374c790a-9148-427c-9993-1acc1e9cbc33" />
+<img width="1920" height="1029" alt="Screenshot 2025-07-12 010556" src="https://github.com/user-attachments/assets/ae60d906-e708-49a1-a9b0-65a2165c54cb" />
+<img width="1920" height="1029" alt="Screenshot 2025-07-12 010546" src="https://github.com/user-attachments/assets/3bfde71b-d9d9-4903-b901-5097c243dd05" />
 
 📌 Author
 
