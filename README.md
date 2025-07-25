@@ -128,7 +128,6 @@ RevealRecon does it all in one go.
 <img width="1920" height="1029" alt="Screenshot 2025-07-12 010659" src="https://github.com/user-attachments/assets/a6b92d2b-69de-4e13-bbc0-b2d67bdcfd97" />
 <img width="1920" height="1029" alt="Screenshot 2025-07-12 010650" src="https://github.com/user-attachments/assets/374c790a-9148-427c-9993-1acc1e9cbc33" />
 <img width="1920" height="1029" alt="Screenshot 2025-07-12 010556" src="https://github.com/user-attachments/assets/ae60d906-e708-49a1-a9b0-65a2165c54cb" />
-<img width="1920" height="1029" alt="Screenshot 2025-07-12 010546" src="https://github.com/user-attachments/assets/3bfde71b-d9d9-4903-b901-5097c243dd05" />
 
 📌 Author
 
